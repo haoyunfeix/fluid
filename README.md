@@ -2,6 +2,8 @@
 
 This repo contains sample that porting from [DirectX SDK Samples](https://github.com/walbourn/directx-sdk-samples/tree/master/FluidCS11).
 
+Visit active demo [online](https://haoyunfeix.github.io/fluid/).
+
 ## Requirements
 
 Latest Chrome Canary or Chrome Dev
