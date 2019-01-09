@@ -32,17 +32,17 @@ layout(std140, binding = 0) uniform CbSimulationConstants
 
 layout(std140, binding = 1) buffer ParticlesRW
 {
-    Particle particles[${g_iNumParticles}];
+    Particle particles[];
 } particlesRW;
 
 layout(std140, binding = 2) buffer ParticlesRO
 {
-    readonly Particle particles[${g_iNumParticles}];
+    readonly Particle particles[];
 } particlesRO;
 
 layout(std140, binding = 3) buffer ParticlesForcesRO
 {
-    readonly ParticleForces particles[${g_iNumParticles}];
+    readonly ParticleForces particles[];
 } particlesForcesRO;
 
 

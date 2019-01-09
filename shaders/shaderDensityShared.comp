@@ -4,7 +4,7 @@ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void GroupMemoryBarrierWithGroupSync()
 {
-    groupMemoryBarrier();
+    memoryBarrierShared();
     barrier();
 }
 
@@ -40,12 +40,12 @@ layout(std140, binding = 0) uniform CbSimulationConstants
 
 layout(std140, binding = 1) buffer ParticlesRO
 {
-    Particle particles[${g_iNumParticles}];
+    Particle particles[];
 } particlesRO;
 
 layout(std140, binding = 2) buffer ParticlesDensityRW
 {
-    ParticleDensity particles[${g_iNumParticles}];
+    ParticleDensity particles[];
 } particlesDensityRW;
 
 float CalculateDensity(float r_sq)
