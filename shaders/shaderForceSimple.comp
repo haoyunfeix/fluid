@@ -39,17 +39,17 @@ layout(std140, binding = 0) uniform CbSimulationConstants
 
 layout(std140, binding = 1) buffer ParticlesRO
 {
-    Particle particles[${g_iNumParticles}];
+    Particle particles[];
 } particlesRO;
 
 layout(std140, binding = 2) buffer ParticlesDensityRO
 {
-    readonly ParticleDensity particles[${g_iNumParticles}];
+    readonly ParticleDensity particles[];
 } particlesDensityRO;
 
 layout(std140, binding = 3) buffer ParticlesForcesRW
 {
-    ParticleForces particles[${g_iNumParticles}];
+    ParticleForces particles[];
 } particlesForcesRW;
 
 float CalculatePressure(float density)
