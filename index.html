@@ -86,7 +86,6 @@ var gl = WebGLUtils.setupWebGL2Compute(g_canvas);
 var g_modelBuffer = null;
 var g_iNumParticles = 8 * 1024;
 var g_dispatchNum = Math.ceil(g_iNumParticles / 256);
-const iStartingWidth = Math.round(Math.sqrt(g_iNumParticles));
 var g_fInitialParticleSpacing = 0.0045
 var g_particleBuffers = [];
 var g_tmpBuffer = null;
@@ -260,6 +259,7 @@ function restart(num) {
 }
 
 function initBuffers() {
+    var iStartingWidth = Math.round(Math.sqrt(g_iNumParticles));
     var particles = new Float32Array(4 * g_iNumParticles);
     for ( var i = 0,n = 0 ; i < 4 * g_iNumParticles;) {
         var x = n % iStartingWidth;
