@@ -1,0 +1,575 @@
+<!--
+
+/*
+** Copyright (c) 2018 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ComputeBoids Example.</title>
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+}
+.container {
+  position: absolute;
+  top: 40px;
+  left: 10px;
+  z-index: 3;
+  color: gray;
+  background-color: rgba(0,0,0,0.5);
+  border-radius: 10px;
+  padding: 10px;
+}
+.fpsContainer {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  color: yellow;
+  background-color: rgba(0,0,0,0.5);
+  border-radius: 10px;
+  padding: 10px;
+}
+</style>
+<script type="application/javascript" src="./js/gl-matrix.js"></script>
+<script type="application/javascript" src="./js/webgl-utils.js"></script>
+<script type="application/javascript" src="./js/fps.js"></script>
+</head>
+<body>
+<canvas id="example"></canvas>
+<script>
+"use strict";
+
+const VS = 0;
+const FS = 1;
+const CS_DEN_SIM = 2;
+const CS_FOR_SIM = 3;
+const CS_INT  = 4;
+const CS_DEN_SHA = 5;
+const CS_FOR_SHA = 6;
+
+var g_shaderStr = [];
+var g_programs = [];
+var g_currentDen = null;
+var g_currentFor = null;
+
+var g_canvas = document.getElementById("example");
+g_canvas.width  = window.innerWidth;
+g_canvas.height = window.innerHeight;
+var gl = WebGLUtils.setupWebGL2Compute(g_canvas);
+
+var g_modelBuffer = null;
+var g_iNumParticles = 8 * 1024;
+var g_dispatchNum = Math.ceil(g_iNumParticles / 256);
+var g_fInitialParticleSpacing = 0.0045
+var g_particleBuffers = [];
+var g_tmpBuffer = null;
+var g_updateParams = null;
+
+var mat4 = glMatrix.mat4;
+var g_mViewProjection = mat4.create();
+
+var g_fMapHeight = 1.2;
+var g_fMapWidth = (4.0 / 3.0) * g_fMapHeight;
+var g_fSmoothlen = 0.012;
+var g_fPressureStiffness = 200.0;
+var g_fRestDensity = 1000.0;
+var g_fParticleMass = 0.0002;
+var g_fViscosity = 0.1;
+var g_fWallStiffness = 3000.0;
+
+var g_densityProgram = null;
+var g_forceProgram = null;
+var g_integrateProgram = null;
+var g_renderProgram = null;
+
+var g_lastTime = null;
+var g_fpsTimer = null;
+var g_fpsElem = null;
+var g_scheduledRAF = false;
+
+var g_initCntl = false;
+var g_pointSize = 0;
+
+function loadShader(type, shaderSrc) {
+    var shader = gl.createShader(type);
+    // Load the shader source
+    gl.shaderSource(shader, shaderSrc);
+    // Compile the shader
+    gl.compileShader(shader);
+    // Check the compile status
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS) &&
+        !gl.isContextLost()) {
+        var infoLog = gl.getShaderInfoLog(shader);
+        alert("Error compiling shader:\n" + infoLog);
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
+
+function initController() {
+    if (g_initCntl) return;
+    g_initCntl = true;
+    function createElement(element, attribute, inner) {
+        if (typeof(element) === "undefined") {
+          return false;
+        }
+        if (typeof(inner) === "undefined") {
+          inner = "";
+        }
+        var el = document.createElement(element);
+        if (typeof(attribute) === 'object') {
+          for (var key in attribute) {
+            el.setAttribute(key, attribute[key]);
+          }
+        }
+        if (!Array.isArray(inner)) {
+          inner = [inner];
+        }
+        for (var k = 0; k < inner.length; k++) {
+          if (inner[k].tagName) {
+            el.appendChild(inner[k]);
+          } else {
+            el.appendChild(document.createTextNode(inner[k]));
+          }
+        }
+        return el;
+    }
+
+    var fpsContainer = createElement('div', {'class':'fpsContainer'});
+    document.body.appendChild(fpsContainer);
+    var lableFps = createElement('label', {}, 'FPS: ');
+    var sFps = createElement('span', {'id': 'fps'});
+    fpsContainer.appendChild(lableFps);
+    fpsContainer.appendChild(sFps);
+    g_fpsElem = document.getElementById('fps');
+    
+
+    var container = createElement('div', {'class':'container'});
+    document.body.appendChild(container);
+
+    var tButton = createElement(
+      'button', 
+      {
+        'class': 'button',
+        'onClick': 'resetParticles()'
+      },
+      'Reset Particles'
+    );
+    var dButton = createElement('div',{}, tButton);
+
+    var option4k = createElement('option',{'value': '4'}, '4K Particles');
+    var option8k = createElement('option',{'value': '8', 'selected': 'selected'}, '8K Particles');
+    var option16k = createElement('option',{'value': '16'}, '16K Particles');
+    var option32k = createElement('option',{'value': '32'}, '32K Particles');
+    var tSelectP = createElement(
+      'select',
+      {'id': 'selP',
+       'onchange': 'restart(this.value)'},
+      [option4k, option8k, option16k, option32k]
+    );
+    var dSelectP = createElement('div',{}, tSelectP);
+
+    var optionDown = createElement('option',{'value': 'down'}, 'Gravity Down');
+    var optionUp = createElement('option',{'value': 'up'}, 'Gravity Up');
+    var optionLeft = createElement('option',{'value': 'left'}, 'Gravity Left');
+    var optionRight = createElement('option',{'value': 'right'}, 'Gravity Right');
+    var tSelectG = createElement(
+      'select',
+      {'id': 'selG'},
+      [optionDown, optionUp, optionLeft, optionRight]
+    );
+    var dSelectG = createElement('div',{}, tSelectG);
+
+    var radioSimple = createElement('input', 
+      {'type': 'radio',
+       'name': 'mode',
+       'id': 'radio1',
+       'value': 'simple',
+       'onchange': 'changeMode(this)',
+       'checked': 'checked'});
+    var lableSimple = createElement('label', {}, 'Simple N^2');
+    var dRadioSimple = createElement('div', {}, [radioSimple, lableSimple]);
+
+    var radioShared = createElement('input',
+      {'type': 'radio',
+       'name': 'mode',
+       'id': 'radio1',
+       'onchange': 'changeMode(this)',
+       'value': 'shared'});
+    var lableShared = createElement('label', {}, 'Shared Memory N^2');
+    var dRadioShared = createElement('div', {}, [radioShared, lableShared]);
+
+    container.appendChild(dButton);
+    container.appendChild(dSelectP);
+    container.appendChild(dSelectG);
+    container.appendChild(dRadioSimple);
+    container.appendChild(dRadioShared);
+}
+
+function changeMode(o) {
+  if (o.value == 'simple') {
+    g_currentDen = g_programs[CS_DEN_SIM];
+    g_currentFor = g_programs[CS_FOR_SIM];
+  } else {
+    g_currentDen = g_programs[CS_DEN_SHA];
+    g_currentFor = g_programs[CS_FOR_SHA];
+  }
+}
+
+function resetParticles() {
+  destroyBuffers();
+  initBuffers();
+  initRender();
+}
+
+function restart(num) {
+  g_iNumParticles = num * 1024;
+  g_dispatchNum = Math.ceil(g_iNumParticles / 256);
+  g_lastTime = 0;
+  destroyBuffers();
+  initBuffers();
+  initRender();
+}
+
+function initBuffers() {
+    var iStartingWidth = Math.round(Math.sqrt(g_iNumParticles));
+    var particles = new Float32Array(4 * g_iNumParticles);
+    for ( var i = 0,n = 0 ; i < 4 * g_iNumParticles;) {
+        var x = n % iStartingWidth;
+        var y = Math.round(n / iStartingWidth);
+        particles[i] = g_fInitialParticleSpacing * x;
+        particles[i+1] = g_fInitialParticleSpacing * y;
+        i += 4;
+        n++;
+    }
+    g_particleBuffers[0] = gl.createBuffer();
+    gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, g_particleBuffers[0]);
+    gl.bufferData(gl.SHADER_STORAGE_BUFFER, particles, gl.DYNAMIC_DRAW);
+
+
+    var particleDensities = new Float32Array(4 * g_iNumParticles);
+    for ( var i = 0 ; i < 4 * g_iNumParticles;) {
+        particleDensities[i] = 0.0;
+        i += 4;
+    }
+    g_particleBuffers[1] = gl.createBuffer();
+    gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, g_particleBuffers[1]);
+    gl.bufferData(gl.SHADER_STORAGE_BUFFER, particleDensities, gl.DYNAMIC_DRAW);
+
+    var particleForces = new Float32Array(4 * g_iNumParticles);
+    for ( var i = 0 ; i < 4 * g_iNumParticles;) {
+        particleForces[i] = 0.0;
+        particleForces[i + 1] = 0.0;
+        i += 4;
+    }
+    g_particleBuffers[2] = gl.createBuffer();
+    gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, g_particleBuffers[2]);
+    gl.bufferData(gl.SHADER_STORAGE_BUFFER, particleForces, gl.DYNAMIC_DRAW);
+
+    var SimCons = {
+        'iNumParticles': g_iNumParticles,
+        'fTimeStep': 0.005,
+        'fSmoothlen': g_fSmoothlen,
+        'fPressureStiffness': g_fPressureStiffness,
+        'fRestDensity': g_fRestDensity,
+        'fDensityCoef': g_fParticleMass * 315.0 / (64.0 * Math.PI * Math.pow(g_fSmoothlen, 9)),
+        'fGradPressureCoef': g_fParticleMass * -45.0 / (Math.PI * Math.pow(g_fSmoothlen, 6)),
+        'fLapViscosityCoef': g_fParticleMass * g_fViscosity * 45.0 / (Math.PI * Math.pow(g_fSmoothlen, 6)),
+        'fWallStiffness': g_fWallStiffness,
+        'vGravity': [0.0, -0.5, 0.0, 0.0],
+        'vGridDim': [1.0 / g_fSmoothlen, 1.0 / g_fSmoothlen, 0.0, 0.0],
+        'vPlanes':[
+                     [1.0, 0.0, 0.0, 0.0],
+                     [0.0, 1.0, 0.0, 0.0],
+                     [-1.0, 0.0, g_fMapWidth, 0.0],
+                     [0.0, -1.0, g_fMapHeight, 0.0],
+                    ]
+        }
+    var data = new ArrayBuffer(1 * 4 + 8 * 4 + 3 * 4 + 2 * 4 * 4 + 4 * 4 * 4);
+    var view = new Int32Array(data, 0, 1);
+    view[0] = SimCons.iNumParticles;
+    view = new Float32Array(data, 4, 35);
+    view[0] = SimCons.fTimeStep;
+    view[1] = SimCons.fSmoothlen;
+    view[2] = SimCons.fPressureStiffness;
+    view[3] = SimCons.fRestDensity;
+    view[4] = SimCons.fDensityCoef;
+    view[5] = SimCons.fGradPressureCoef;
+    view[6] = SimCons.fLapViscosityCoef;
+    view[7] = SimCons.fWallStiffness;
+    view[8] = 0.0;
+    view[9] = 0.0;
+    view[10] = 0.0;
+    view[11] = SimCons.vGravity[0];
+    view[12] = SimCons.vGravity[1];
+    view[13] = SimCons.vGravity[2];
+    view[14] = SimCons.vGravity[3];
+    view[15] = SimCons.vGridDim[0];
+    view[16] = SimCons.vGridDim[1];
+    view[17] = SimCons.vGridDim[2];
+    view[18] = SimCons.vGridDim[3];
+    view[19] = SimCons.vPlanes[0][0];
+    view[20] = SimCons.vPlanes[0][1];
+    view[21] = SimCons.vPlanes[0][2];
+    view[22] = SimCons.vPlanes[0][3];
+    view[23] = SimCons.vPlanes[1][0];
+    view[24] = SimCons.vPlanes[1][1];
+    view[25] = SimCons.vPlanes[1][2];
+    view[26] = SimCons.vPlanes[1][3];
+    view[27] = SimCons.vPlanes[2][0];
+    view[28] = SimCons.vPlanes[2][1];
+    view[29] = SimCons.vPlanes[2][2];
+    view[30] = SimCons.vPlanes[2][3];
+    view[31] = SimCons.vPlanes[3][0];
+    view[32] = SimCons.vPlanes[3][1];
+    view[33] = SimCons.vPlanes[3][2];
+    view[34] = SimCons.vPlanes[3][3];
+    g_updateParams = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, g_updateParams);
+    gl.bufferData(gl.UNIFORM_BUFFER, new Uint8Array(data), gl.STATIC_DRAW);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, g_updateParams);
+
+    var orthographic =
+        function(left, right, bottom, top, near, far) {
+      return [
+        2 / (right - left), 0, 0, 0,
+        0, 2 / (top - bottom), 0, 0,
+        0, 0, 1 / (near - far), 0,
+        (left + right) / (left - right),
+        (bottom + top) / (bottom - top),
+        near / (near - far), 1
+      ];
+    };
+    var mView = [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      -g_fMapWidth/2.0, -g_fMapHeight / 2.0, 0, 1
+    ];
+    var mProjection = orthographic(-g_fMapWidth/2.0, g_fMapWidth/2.0,-g_fMapHeight / 2.0,
+        g_fMapHeight / 2.0, 0, 1);
+    mat4.multiply(g_mViewProjection, mProjection, mView);
+}
+
+function initRender()
+{
+    gl.viewport(0, 0, g_canvas.width, g_canvas.height);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+    g_pointSize = 4.0 * g_canvas.width * g_canvas.height / (1024 * 1024);
+
+    var vertexShader = loadShader(gl.VERTEX_SHADER, g_shaderStr[VS]);
+    var fragmentShader = loadShader(gl.FRAGMENT_SHADER, g_shaderStr[FS]);
+    g_programs[VS] = gl.createProgram();
+    gl.attachShader(g_programs[VS], vertexShader);
+    gl.attachShader(g_programs[VS], fragmentShader);
+
+    // Bind a_particlePos to attribute 0
+    // Bind a_particleVel to attribute 1
+    gl.bindAttribLocation(g_programs[VS], 0, "a_particlePos");
+    gl.bindAttribLocation(g_programs[VS], 1, "a_particleDen");
+
+    // Load the vertex data
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_particleBuffers[0]);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 16, 0);
+    gl.vertexAttribDivisor(0, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_particleBuffers[1]);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, gl.FALSE, 16, 0);
+    gl.vertexAttribDivisor(1, 1);
+
+    // Link the program
+    gl.linkProgram(g_programs[VS]);
+    gl.useProgram(g_programs[VS]);
+
+    // Set uniforms
+    var mViewProjectionLoc = gl.getUniformLocation(g_programs[VS], "u_viewProjection");
+    gl.uniformMatrix4fv(mViewProjectionLoc, false, g_mViewProjection);
+    var fPointSizeLoc = gl.getUniformLocation(g_programs[VS], "u_fPointSize");
+    gl.uniform1f(fPointSizeLoc, g_pointSize);
+}
+
+function initCS() {
+    [CS_DEN_SIM, CS_DEN_SHA, CS_FOR_SIM, CS_FOR_SHA, CS_INT]
+    .forEach((v) => {
+        var cs = loadShader(gl.COMPUTE_SHADER, g_shaderStr[v]);
+        g_programs[v] = gl.createProgram();
+        gl.attachShader(g_programs[v], cs);
+        gl.linkProgram(g_programs[v]);
+    });
+}
+
+function destroyBuffers() {
+    gl.deleteBuffer(g_particleBuffers[0]);
+    gl.deleteBuffer(g_particleBuffers[1]);
+    gl.deleteBuffer(g_particleBuffers[2]);
+    gl.deleteBuffer(g_updateParams);
+}
+
+function computeDensityPass()
+{
+    gl.useProgram(g_currentDen);
+
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[0]);
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[1]);
+    gl.dispatchCompute(g_dispatchNum, 1, 1);
+}
+
+function computeForcePass()
+{
+    gl.useProgram(g_currentFor);
+
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[0]);
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[1]);
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[2]);
+    gl.dispatchCompute(g_dispatchNum, 1, 1);
+}
+
+function computeIntegratePass()
+{
+    gl.useProgram(g_programs[CS_INT]);
+
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[0]);
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[0]);
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[2]);
+    gl.dispatchCompute(g_dispatchNum, 1, 1);
+}
+
+function renderPass()
+{
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(g_programs[VS]);
+
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, g_particleBuffers[0]);
+    gl.drawArraysInstanced(gl.POINTS, 0, 1, g_iNumParticles);
+}
+
+function init() {
+    g_fpsTimer = new fps.FPSTimer();
+    initController();
+    initBuffers();
+    initCS();
+
+    // set default as simple mode
+    g_currentDen = g_programs[CS_DEN_SIM];
+    g_currentFor = g_programs[CS_FOR_SIM];
+
+    initRender();
+
+    // make canvas auto fit window
+    window.addEventListener('resize', function(){onResize();}, false);
+    function onResize(){
+      g_canvas.width = window.innerWidth * window.devicePixelRatio;
+      g_canvas.height = window.innerHeight * window.devicePixelRatio;
+      gl.viewport(0, 0, g_canvas.width, g_canvas.height);
+
+      // Reset point size
+      g_pointSize = 4.0 * g_canvas.width * g_canvas.height / (1024 * 1024);
+      var fPointSizeLoc = gl.getUniformLocation(g_programs[VS], "u_fPointSize");
+      gl.uniform1f(fPointSizeLoc, g_pointSize);
+    }
+}
+
+function tick() {
+    var now = (new Date()).getTime() * 0.001;
+    var elapsedTime;
+    if(g_lastTime == 0.0) {
+      elapsedTime = 0.0;
+    } else {
+      elapsedTime = now - g_lastTime;
+    }
+    g_lastTime = now;
+    g_fpsTimer.update(elapsedTime);
+    g_fpsElem.innerHTML = g_fpsTimer.averageFPS;
+}
+
+function frame()
+{
+    if(g_scheduledRAF) {return;}
+    g_scheduledRAF = true;
+    tick();
+    computeDensityPass();
+    computeForcePass();
+    computeIntegratePass();
+    renderPass();
+    requestAnimationFrame(() => {
+      g_scheduledRAF = false;
+      frame();
+    });
+}
+
+function start() {
+    if (!gl)
+        return;
+    init();
+    requestAnimationFrame(frame);
+}
+
+function loadShaderFromFile(filename, index, onLoadShader) {
+    var request = new XMLHttpRequest();
+    request.onreadystatechange = function () {
+        if(request.readyState === 4 && request.status === 200) {
+            onLoadShader(index, request.responseText);
+        }
+    };
+    request.open("GET", './shaders/' + filename, true);
+    request.send();
+}
+
+function main() {
+    var tryToStart = function () {
+        if (g_shaderStr[0] && g_shaderStr[1] && g_shaderStr[2] && g_shaderStr[3]
+          && g_shaderStr[4] && g_shaderStr[5] && g_shaderStr[6]) start();
+    }
+
+    var shaders = ['shader.vert',
+        'shader.frag',
+        'shaderDensitySimple.comp',
+        'shaderForceSimple.comp',
+        'shaderIntegrate.comp',
+        'shaderDensityShared.comp',
+        'shaderForceShared.comp'];
+    for (var i = 0; i < shaders.length; i++) {
+        loadShaderFromFile(shaders[i], i, (index, str) => {
+            g_shaderStr[index] = str;
+            tryToStart();
+        }); 
+    }
+}
+
+main();
+
+</script>
+
+</body>
+</html>
+
