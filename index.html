@@ -442,6 +442,7 @@ function computeDensityPass()
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[0]);
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[1]);
     gl.dispatchCompute(g_dispatchNum, 1, 1);
+    gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
 }
 
 function computeForcePass()
@@ -452,6 +453,7 @@ function computeForcePass()
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[1]);
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[2]);
     gl.dispatchCompute(g_dispatchNum, 1, 1);
+    gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
 }
 
 function computeIntegratePass()
@@ -462,6 +464,7 @@ function computeIntegratePass()
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[0]);
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[2]);
     gl.dispatchCompute(g_dispatchNum, 1, 1);
+    gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
 }
 
 function renderPass()
