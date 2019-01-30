@@ -72,6 +72,11 @@ const CS_FOR_SIM = 3;
 const CS_INT  = 4;
 const CS_DEN_SHA = 5;
 const CS_FOR_SHA = 6;
+const CS_BUILD_GRID = 7;
+const CS_BITONIC_SORT = 8;
+const CS_TRANSPOSE = 9;
+const CS_CLEAR_GRID_IND = 10;
+const CS_BUILD_GRID_IND = 11;
 
 var g_shaderStr = [];
 var g_programs = [];
@@ -84,6 +89,9 @@ g_canvas.height = window.innerHeight;
 var gl = WebGLUtils.setupWebGL2Compute(g_canvas);
 
 var g_iNumParticles = 8 * 1024;
+var g_BITONIC_BLOCK_SIZE = 512;
+var g_TRANSPOSE_BLOCK_SIZE = 16;
+var g_SIMULATION_BLOCK_SIZE = 256;
 var g_threads = 128;
 var g_dispatchNum = Math.ceil(g_iNumParticles / g_threads);
 var g_fInitialParticleSpacing = 0.0045
@@ -228,11 +236,21 @@ function initController() {
     var lableShared = createElement('label', {}, 'Shared Memory N^2');
     var dRadioShared = createElement('div', {}, [radioShared, lableShared]);
 
+    var radioGrid = createElement('input',
+      {'type': 'radio',
+       'name': 'mode',
+       'id': 'radio1',
+       'onchange': 'changeMode(this)',
+       'value': 'grid'});
+    var lableGrid = createElement('label', {}, 'Grid + Sort');
+    var dRadioGrid = createElement('div', {}, [radioGrid, lableGrid]);
+
     container.appendChild(dButton);
     container.appendChild(dSelectP);
     container.appendChild(dSelectG);
     container.appendChild(dRadioSimple);
     container.appendChild(dRadioShared);
+    container.appendChild(dRadioGrid);
 }
 
 function changeMode(o) {
@@ -258,6 +276,87 @@ function restart(num) {
   destroyBuffers();
   initBuffers();
   initRender();
+}
+
+function GPUSort(){
+    var NUM_ELEMENTS = g_iNumParticles;
+    var MATRIX_WIDTH = g_BITONIC_BLOCK_SIZE;
+    var MATRIX_HEIGHT = NUM_ELEMENTS / g_BITONIC_BLOCK_SIZE;
+
+    // Sort the data
+    // First sort the rows for the levels <= to the block size
+    for( var level = 2 ; level <= g_BITONIC_BLOCK_SIZE ; level <<= 1 )
+    {
+        var sortCB = new Int32Array(4);
+        sortCB[0] = level;
+        sortCB[1] = level;
+        sortCB[2] = MATRIX_HEIGHT;
+        sortCB[3] = MATRIX_WIDTH;
+        var updateSortCB = gl.createBuffer();
+        gl.bindBuffer(gl.UNIFORM_BUFFER, updateSortCB);
+        gl.bufferData(gl.UNIFORM_BUFFER, sortCB, gl.STATIC_DRAW);
+        gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, updateSortCB);
+
+        // Sort the row data
+        //computeBitonicPass();
+        gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[3]);
+        gl.useProgram(g_programs[CS_BITONIC_SORT]);
+        gl.dispatchCompute(g_iNumParticles / g_BITONIC_BLOCK_SIZE, 1, 1);
+        gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+    }
+
+    // Then sort the rows and columns for the levels > than the block size
+    // Transpose. Sort the Columns. Transpose. Sort the Rows.
+    for( var level = (g_BITONIC_BLOCK_SIZE << 1) ; level <= NUM_ELEMENTS ; level <<= 1 )
+    {
+        var sortCB1 = new Int32Array(4);
+        sortCB1[0] = level / g_BITONIC_BLOCK_SIZE;
+        sortCB1[1] = (level & ~NUM_ELEMENTS) / g_BITONIC_BLOCK_SIZE;
+        sortCB1[2] = MATRIX_WIDTH;
+        sortCB1[3] = MATRIX_HEIGHT;
+        var updateSortCB1 = gl.createBuffer();
+        gl.bindBuffer(gl.UNIFORM_BUFFER, updateSortCB1);
+        gl.bufferData(gl.UNIFORM_BUFFER, sortCB1, gl.STATIC_DRAW);
+
+        gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, updateSortCB1);
+        gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[3]);
+        gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[4]);
+
+        // Transpose the data from buffer 1 into buffer 2
+        gl.useProgram(g_programs[CS_TRANSPOSE]);
+        gl.dispatchCompute(MATRIX_WIDTH / g_TRANSPOSE_BLOCK_SIZE,
+            MATRIX_HEIGHT / g_TRANSPOSE_BLOCK_SIZE, 1);
+        gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+
+        // Sort the transposed column data
+        //gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[3]);
+        gl.useProgram(g_programs[CS_BITONIC_SORT]);
+        gl.dispatchCompute(g_iNumParticles / g_BITONIC_BLOCK_SIZE, 1, 1);
+        gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+
+        var sortCB2 = new Int32Array(4);
+        sortCB1[0] = g_BITONIC_BLOCK_SIZE;
+        sortCB1[1] = level;
+        sortCB1[2] = MATRIX_HEIGHT;
+        sortCB1[3] = MATRIX_WIDTH;
+        var updateSortCB2 = gl.createBuffer();
+        gl.bindBuffer(gl.UNIFORM_BUFFER, updateSortCB2);
+        gl.bufferData(gl.UNIFORM_BUFFER, sortCB2, gl.STATIC_DRAW);
+
+        // Transpose the data from buffer 2 back into buffer 1
+        gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[4]);
+        gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[3]);
+        gl.useProgram(g_programs[CS_TRANSPOSE]);
+        gl.dispatchCompute(MATRIX_HEIGHT / g_TRANSPOSE_BLOCK_SIZE,
+            MATRIX_WIDTH / g_TRANSPOSE_BLOCK_SIZE, 1);
+        gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+
+        // Sort the row data
+        //gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[4]);
+        gl.useProgram(g_programs[CS_BITONIC_SORT]);
+        gl.dispatchCompute(g_iNumParticles / g_BITONIC_BLOCK_SIZE, 1, 1);
+        gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+    }
 }
 
 function initBuffers() {
@@ -294,6 +393,16 @@ function initBuffers() {
     g_particleBuffers[2] = gl.createBuffer();
     gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, g_particleBuffers[2]);
     gl.bufferData(gl.SHADER_STORAGE_BUFFER, particleForces, gl.DYNAMIC_DRAW);
+
+    var grids = new Int32Array(g_iNumParticles);
+    g_particleBuffers[3] = gl.createBuffer();
+    gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, g_particleBuffers[3]);
+    gl.bufferData(gl.SHADER_STORAGE_BUFFER, grids, gl.DYNAMIC_DRAW);
+
+    var gridsTemp = new Int32Array(g_iNumParticles);
+    g_particleBuffers[4] = gl.createBuffer();
+    gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, g_particleBuffers[4]);
+    gl.bufferData(gl.SHADER_STORAGE_BUFFER, gridsTemp, gl.DYNAMIC_DRAW);
 
     var SimCons = {
         'iNumParticles': g_iNumParticles,
@@ -421,7 +530,8 @@ function initRender()
 }
 
 function initCS() {
-    [CS_DEN_SIM, CS_DEN_SHA, CS_FOR_SIM, CS_FOR_SHA, CS_INT]
+    [CS_DEN_SIM, CS_DEN_SHA, CS_FOR_SIM, CS_FOR_SHA, CS_INT, CS_BUILD_GRID,
+        CS_BITONIC_SORT, CS_TRANSPOSE, CS_CLEAR_GRID_IND, CS_BUILD_GRID_IND]
     .forEach((v) => {
         var cs = loadShader(gl.COMPUTE_SHADER, g_shaderStr[v]);
         g_programs[v] = gl.createProgram();
@@ -465,6 +575,25 @@ function computeIntegratePass()
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[0]);
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[2]);
     gl.dispatchCompute(g_dispatchNum, 1, 1);
+    gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+}
+
+function computeBuildGridPass()
+{
+    gl.useProgram(g_programs[CS_BUILD_GRID]);
+
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[0]);
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[3]);
+    gl.dispatchCompute(g_dispatchNum / g_SIMULATION_BLOCK_SIZE, 1, 1);
+    gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+}
+
+function computeBitonicPass()
+{
+    gl.useProgram(g_programs[CS_BITONIC_SORT]);
+
+    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[3]);
+    gl.dispatchCompute(g_iNumParticles / g_BITONIC_BLOCK_SIZE, 1, 1);
     gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
 }
 
@@ -531,6 +660,14 @@ function frame()
     if(g_scheduledRAF) {return;}
     g_scheduledRAF = true;
     tick();
+    // Build Grid
+    computeBuildGridPass();
+    // Sort Grid
+    GPUSort();
+    // Build Grid Indices
+    gl.useProgram(g_programs[CS_CLEAR_GRID_IND]);
+    gl.dispatchCompute(g_NUM_GRID_INDICES / g_SIMULATION_BLOCK_SIZE, 1, 1);
+    gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
     computeDensityPass();
     computeForcePass();
     computeIntegratePass();
@@ -562,7 +699,8 @@ function loadShaderFromFile(filename, index, onLoadShader) {
 function main() {
     var tryToStart = function () {
         if (g_shaderStr[0] && g_shaderStr[1] && g_shaderStr[2] && g_shaderStr[3]
-          && g_shaderStr[4] && g_shaderStr[5] && g_shaderStr[6]) start();
+          && g_shaderStr[4] && g_shaderStr[5] && g_shaderStr[6] && g_shaderStr[7]
+          && g_shaderStr[8] && g_shaderStr[9] && g_shaderStr[10] && g_shaderStr[11]) start();
     }
 
     var shaders = ['shader.vert',
@@ -571,7 +709,12 @@ function main() {
         'shaderForceSimple.comp',
         'shaderIntegrate.comp',
         'shaderDensityShared.comp',
-        'shaderForceShared.comp'];
+        'shaderForceShared.comp',
+        'shaderBuildGrid.comp',
+        'shaderBitonicSort.comp',
+        'shaderTranspose.comp',
+        'shaderClearGridIndices.comp',
+        'shaderBuildGridIndices.comp'];
     for (var i = 0; i < shaders.length; i++) {
         loadShaderFromFile(shaders[i], i, (index, str) => {
             g_shaderStr[index] = str;
