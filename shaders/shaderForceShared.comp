@@ -1,6 +1,6 @@
 #version 310 es
 precision mediump float;
-layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = NUM_THREADS, local_size_y = 1, local_size_z = 1) in;
 
 void GroupMemoryBarrierWithGroupSync()
 {
@@ -83,7 +83,7 @@ shared struct anonym0
     vec2  velocity;
     float density;
 }
-force_shared_pos[128];
+force_shared_pos[NUM_THREADS];
 
 void main()
 {
@@ -94,13 +94,13 @@ void main()
     float P_pressure = CalculatePressure(P_density);
     float h_sq = cbSimulationConstants.g_fSmoothlen * cbSimulationConstants.g_fSmoothlen;
     vec2 acceleration = vec2(0, 0);
-    for (uint N_block_ID = 0u; N_block_ID < cbSimulationConstants.g_iNumParticles; N_block_ID += 128u)
+    for (uint N_block_ID = 0u; N_block_ID < cbSimulationConstants.g_iNumParticles; N_block_ID += NUM_THREADSu)
     {
         force_shared_pos[gl_LocalInvocationIndex].position = particlesRO.particles[N_block_ID + gl_LocalInvocationIndex].position;
         force_shared_pos[gl_LocalInvocationIndex].velocity = particlesRO.particles[N_block_ID + gl_LocalInvocationIndex].velocity;
         force_shared_pos[gl_LocalInvocationIndex].density = particlesDensityRO.particles[N_block_ID + gl_LocalInvocationIndex].density;
         GroupMemoryBarrierWithGroupSync();
-        for (uint N_tile_ID = 0u; N_tile_ID < 128u; N_tile_ID++)
+        for (uint N_tile_ID = 0u; N_tile_ID < NUM_THREADSu; N_tile_ID++)
         {
             uint N_ID = N_block_ID + N_tile_ID;
             vec2 N_position = force_shared_pos[N_tile_ID].position;

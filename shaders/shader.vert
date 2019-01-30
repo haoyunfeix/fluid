@@ -6,7 +6,7 @@ layout(location = 1) in float a_particleDen;
 uniform mat4 u_viewProjection;
 uniform float u_fPointSize;
 
-out vec4 COLOR0;
+out vec4 color;
 
 struct Particle
 {
@@ -33,7 +33,7 @@ vec4 VisualizeNumber(float n, float lower, float upper)
 
 void main()
 {
-    COLOR0 = VisualizeNumber(a_particleDen, 1000.0f, 2000.0f);
+    color = VisualizeNumber(a_particleDen, 1000.0f, 2000.0f);
     gl_Position = (u_viewProjection * vec4(a_particlePos, 0.0, 1.0));
     gl_PointSize = u_fPointSize;
 }

@@ -1,7 +1,7 @@
 <!--
 
 /*
-** Copyright (c) 2018 The Khronos Group Inc.
+** Copyright (c) 2019 The Khronos Group Inc.
 **
 ** Permission is hereby granted, free of charge, to any person obtaining a
 ** copy of this software and/or associated documentation files (the
@@ -29,7 +29,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>ComputeBoids Example.</title>
+<title>Fluid Example.</title>
 <style>
 body {
   margin: 0;
@@ -83,12 +83,11 @@ g_canvas.width  = window.innerWidth;
 g_canvas.height = window.innerHeight;
 var gl = WebGLUtils.setupWebGL2Compute(g_canvas);
 
-var g_modelBuffer = null;
 var g_iNumParticles = 8 * 1024;
-var g_dispatchNum = Math.ceil(g_iNumParticles / 128);
+var g_threads = 128;
+var g_dispatchNum = Math.ceil(g_iNumParticles / g_threads);
 var g_fInitialParticleSpacing = 0.0045
 var g_particleBuffers = [];
-var g_tmpBuffer = null;
 var g_updateParams = null;
 
 var mat4 = glMatrix.mat4;
@@ -102,11 +101,6 @@ var g_fRestDensity = 1000.0;
 var g_fParticleMass = 0.0002;
 var g_fViscosity = 0.1;
 var g_fWallStiffness = 3000.0;
-
-var g_densityProgram = null;
-var g_forceProgram = null;
-var g_integrateProgram = null;
-var g_renderProgram = null;
 
 var g_lastTime = null;
 var g_fpsTimer = null;
@@ -131,6 +125,14 @@ function loadShader(type, shaderSrc) {
         return null;
     }
     return shader;
+}
+
+
+function getUrlString(name)
+{
+     var reg = new RegExp("(^|&)"+ name +"=([^&]*)(&|$)");
+     var r = window.location.search.substr(1).match(reg);
+     if(r!=null)return  unescape(r[2]); return null;
 }
 
 function initController() {
@@ -251,7 +253,7 @@ function resetParticles() {
 
 function restart(num) {
   g_iNumParticles = num * 1024;
-  g_dispatchNum = Math.ceil(g_iNumParticles / 128);
+  g_dispatchNum = Math.ceil(g_iNumParticles / g_threads);
   g_lastTime = 0;
   destroyBuffers();
   initBuffers();
@@ -461,7 +463,6 @@ function computeIntegratePass()
     gl.useProgram(g_programs[CS_INT]);
 
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 1, g_particleBuffers[0]);
-    gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 2, g_particleBuffers[0]);
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[2]);
     gl.dispatchCompute(g_dispatchNum, 1, 1);
     gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
@@ -477,6 +478,16 @@ function renderPass()
 }
 
 function init() {
+    var threads = getUrlString('t');
+    if (threads) {
+        g_threads = threads;
+        g_dispatchNum = Math.ceil(g_iNumParticles / g_threads);
+    }
+
+    for (var i in g_shaderStr) {
+        g_shaderStr[i] = g_shaderStr[i].replace(/NUM_THREADS/g, g_threads);
+    };
+
     g_fpsTimer = new fps.FPSTimer();
     initController();
     initBuffers();
