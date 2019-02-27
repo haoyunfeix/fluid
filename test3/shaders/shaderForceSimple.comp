@@ -2,12 +2,6 @@
 precision mediump float;
 layout(local_size_x = NUM_THREADS, local_size_y = 1, local_size_z = 1) in;
 
-void GroupMemoryBarrierWithGroupSync()
-{
-    memoryBarrierShared();
-    barrier();
-}
-
 struct Particle
 {
     vec2 position;
@@ -27,7 +21,7 @@ struct ParticleDensity
     float padding3;
 };
 
-layout(std140, binding = 0) uniform CbSimulationConstants
+layout(std140, binding = 10) uniform CbSimulationConstants
 {
     uint  g_iNumParticles;
     float g_fTimeStep;
@@ -43,17 +37,17 @@ layout(std140, binding = 0) uniform CbSimulationConstants
     vec3  g_vPlanes[4];
 } cbSimulationConstants;
 
-layout(std140, binding = 1) buffer ParticlesRO
+layout(std140, binding = 0) buffer ParticlesRO
 {
     Particle particles[];
 } particlesRO;
 
-layout(std140, binding = 2) buffer ParticlesDensityRO
+layout(std140, binding = 1) buffer ParticlesDensityRO
 {
     readonly ParticleDensity particles[];
 } particlesDensityRO;
 
-layout(std140, binding = 3) buffer ParticlesForcesRW
+layout(std140, binding = 2) buffer ParticlesForcesRW
 {
     ParticleForces particles[];
 } particlesForcesRW;
@@ -77,14 +71,6 @@ vec2 CalculateLapVelocity(float r, vec2 P_velocity, vec2 N_velocity, float N_den
     return cbSimulationConstants.g_fLapViscosityCoef / N_density * (h - r) * vel_diff;
 }
 
-shared struct anonym0
-{
-    vec2  position;
-    vec2  velocity;
-    float density;
-}
-force_shared_pos[NUM_THREADS];
-
 void main()
 {
     int P_ID = int(gl_GlobalInvocationID.x);
@@ -94,29 +80,20 @@ void main()
     float P_pressure = CalculatePressure(P_density);
     float h_sq = cbSimulationConstants.g_fSmoothlen * cbSimulationConstants.g_fSmoothlen;
     vec2 acceleration = vec2(0, 0);
-    for (uint N_block_ID = 0u; N_block_ID < cbSimulationConstants.g_iNumParticles; N_block_ID += NUM_THREADSu)
+    for (uint N_ID = 0u; N_ID < cbSimulationConstants.g_iNumParticles; N_ID++)
     {
-        force_shared_pos[gl_LocalInvocationIndex].position = particlesRO.particles[N_block_ID + gl_LocalInvocationIndex].position;
-        force_shared_pos[gl_LocalInvocationIndex].velocity = particlesRO.particles[N_block_ID + gl_LocalInvocationIndex].velocity;
-        force_shared_pos[gl_LocalInvocationIndex].density = particlesDensityRO.particles[N_block_ID + gl_LocalInvocationIndex].density;
-        GroupMemoryBarrierWithGroupSync();
-        for (uint N_tile_ID = 0u; N_tile_ID < NUM_THREADSu; N_tile_ID++)
+        vec2 N_position = particlesRO.particles[N_ID].position;
+        vec2 diff = N_position - P_position;
+        float r_sq = dot(diff, diff);
+        if (r_sq < h_sq && uint(P_ID) != N_ID)
         {
-            uint N_ID = N_block_ID + N_tile_ID;
-            vec2 N_position = force_shared_pos[N_tile_ID].position;
-            vec2 diff = N_position - P_position;
-            float r_sq = dot(diff, diff);
-            if (r_sq < h_sq && uint(P_ID) != N_ID)
-            {
-                vec2 N_velocity = force_shared_pos[N_tile_ID].velocity;
-                float N_density = force_shared_pos[N_tile_ID].density;
-                float N_pressure = CalculatePressure(N_density);
-                float r = sqrt(r_sq);
-                acceleration += CalculateGradPressure(r, P_pressure, N_pressure, N_density, diff);
-                acceleration += CalculateLapVelocity(r, P_velocity, N_velocity, N_density);
-            }
+            vec2 N_velocity = particlesRO.particles[N_ID].velocity;
+            float N_density = particlesDensityRO.particles[N_ID].density;
+            float N_pressure = CalculatePressure(N_density);
+            float r = sqrt(r_sq);
+            acceleration += CalculateGradPressure(r, P_pressure, N_pressure, N_density, diff);
+            acceleration += CalculateLapVelocity(r, P_velocity, N_velocity, N_density);
         }
-        GroupMemoryBarrierWithGroupSync();
     }
     particlesForcesRW.particles[P_ID].acceleration = acceleration / P_density;
 }

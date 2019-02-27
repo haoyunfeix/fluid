@@ -14,7 +14,7 @@ struct ParticleForces
     vec2 acceleration;
 };
 
-layout(std140, binding = 0) uniform CbSimulationConstants
+layout(std140, binding = 10) uniform CbSimulationConstants
 {
     uint  g_iNumParticles;
     float g_fTimeStep;
@@ -30,12 +30,12 @@ layout(std140, binding = 0) uniform CbSimulationConstants
     vec3  g_vPlanes[4];
 } cbSimulationConstants;
 
-layout(std140, binding = 1) buffer ParticlesRW
+layout(std140, binding = 0) buffer ParticlesRW
 {
     Particle particles[];
 } particlesRW;
 
-layout(std140, binding = 3) buffer ParticlesForcesRO
+layout(std140, binding = 2) buffer ParticlesForcesRO
 {
     readonly ParticleForces particles[];
 } particlesForcesRO;
