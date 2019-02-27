@@ -10,10 +10,10 @@ struct Particle
 
 struct Grid
 {
-    int grid;
-    int padding1;
-    int padding2;
-    int padding3;
+    uint grid;
+    uint padding1;
+    uint padding2;
+    uint padding3;
 };
 
 layout(std140, binding = 10) uniform CbSimulationConstants
@@ -47,16 +47,17 @@ vec2 GridCalculateCell(vec2 position)
     return clamp(position * cbSimulationConstants.g_vGridDim.xy + cbSimulationConstants.g_vGridDim.zw, vec2(0, 0), vec2(255, 255));
 }
 
-int GridConstuctKeyValuePair(vec2 xy, uint value)
+uint GridConstuctKeyValuePair(uvec2 xy, uint value)
 {
-    return int(dot(vec3(xy.yx, value), vec3(256 * 256 * 256, 256 * 256, 1)));
+    return uint(uint(xy.y) * uint(256) * uint(256) * uint(256) + uint(xy.x) * uint(256) * uint(256) + uint(value));
 }
 
 void main()
 {
-    int P_ID = int(gl_GlobalInvocationID.x);
+    uint P_ID = uint(gl_GlobalInvocationID.x);
     vec2 position = particlesRO.data[P_ID].position;
     vec2 grid_xy = GridCalculateCell(position);
-    gridRW.data[P_ID].grid = GridConstuctKeyValuePair(vec2(grid_xy), uint(P_ID));
+    gridRW.data[P_ID].grid = GridConstuctKeyValuePair(uvec2(grid_xy), uint(P_ID));
+    //gridRW.data[P_ID].grid = GridConstuctKeyValuePair(uvec2(uint(0), uint(0)), uint(grid_xy.x));
 }
 

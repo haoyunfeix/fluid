@@ -609,6 +609,10 @@ function computeBuildGridPass()
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[3]);
     gl.dispatchCompute(g_iNumParticles / g_SIMULATION_BLOCK_SIZE, 1, 1);
     gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+
+//debug(0, 'computeBuildGrid0');
+//debug(3, 'computeBuildGrid3');
+//debug(0, 'computeBuildGrid0');
 }
 
 function renderPass()
@@ -669,6 +673,21 @@ function tick() {
     g_fpsElem.innerHTML = g_fpsTimer.averageFPS;
 }
 
+function debug(n, s)
+{
+if(n == 0)
+var arrBuffer = new Float32Array(g_iNumParticles * Float32Array.BYTES_PER_ELEMENT);
+if(n == 3)
+var arrBuffer = new Int32Array(g_iNumParticles * Int32Array.BYTES_PER_ELEMENT);
+if(n == 5)
+var arrBuffer = new Int32Array(g_iNumParticles * Int32Array.BYTES_PER_ELEMENT);
+if(n == 6)
+var arrBuffer = new Float32Array(g_iNumParticles * Float32Array.BYTES_PER_ELEMENT);
+gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, n, g_particleBuffers[n]);
+gl.getBufferSubData(gl.SHADER_STORAGE_BUFFER, 0, arrBuffer);
+console.log(s);
+console.log(s+arrBuffer);
+}
 function frame()
 {
     if(g_scheduledRAF) {return;}
@@ -676,24 +695,30 @@ function frame()
     tick();
     // Build Grid
     computeBuildGridPass();
+debug(3, 'GPUSort Grid');
     // Sort Grid
     GPUSort();
     // Build Grid Indices
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 3, g_particleBuffers[3]);
+debug(3, 'GPUSort Grid');
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 5, g_particleBuffers[5]);
     gl.useProgram(g_programs[CS_CLEAR_GRID_IND]);
     gl.dispatchCompute(g_NUM_GRID_INDICES / g_SIMULATION_BLOCK_SIZE, 1, 1);
     gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
 
+//debug(5, 'beforeBuildInd');
     gl.useProgram(g_programs[CS_BUILD_GRID_IND]);
     gl.dispatchCompute(g_iNumParticles / g_SIMULATION_BLOCK_SIZE, 1, 1);
     gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+//debug(5, 'afterBuildInd');
     // Rearrange
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 6, g_particleBuffers[6]);
 
+//debug(6, 'before rearrange');
     gl.useProgram(g_programs[CS_REARRANGE]);
     gl.dispatchCompute(g_iNumParticles / g_SIMULATION_BLOCK_SIZE, 1, 1);
     gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+//debug(6, 'after rearrange');
     // Density
     gl.useProgram(g_programs[CS_DEN_GRID]);
     gl.dispatchCompute(g_iNumParticles / g_SIMULATION_BLOCK_SIZE, 1, 1);

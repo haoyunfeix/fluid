@@ -57,9 +57,9 @@ vec2 GridCalculateCell(vec2 position)
     return clamp(position * cbSimulationConstants.g_vGridDim.xy + cbSimulationConstants.g_vGridDim.zw, vec2(0, 0), vec2(255, 255));
 }
 
-int GridConstuctKey(vec2 xy)
+int GridConstuctKey(ivec2 xy)
 {
-    return int(dot(vec2(xy.yx), vec2(256, 1)));
+    return int(xy.y * 256 + xy.x);
 }
 
 float CalculateDensity(float r_sq)
@@ -79,7 +79,7 @@ void main()
     {
         for (int X = max(G_XY.x - 1, 0); X <= min(G_XY.x + 1, 255); X++)
         {
-            int G_CELL = GridConstuctKey(vec2(X, Y));
+            int G_CELL = GridConstuctKey(ivec2(X, Y));
             uvec2 G_START_END = gridIndicesRO.data[G_CELL].indices;
             for (int N_ID = int(G_START_END.x); uint(N_ID) < G_START_END.y; N_ID++)
             {

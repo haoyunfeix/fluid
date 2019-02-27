@@ -4,10 +4,10 @@ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 struct Grid
 {
-    int grid;
-    int padding1;
-    int padding2;
-    int padding3;
+    uint grid;
+    uint padding1;
+    uint padding2;
+    uint padding3;
 };
 
 struct GridIndices
@@ -41,31 +41,31 @@ layout(std140, binding = 5) buffer GridIndicesRW
     GridIndices data[];
 } gridIndicesRW;
 
-int GridGetKey(int keyvaluepair)
+uint GridGetKey(uint keyvaluepair)
 {
     return (keyvaluepair >> 16);
 }
 
 void main()
 {
-    int G_ID = int(gl_GlobalInvocationID.x);
-    int G_ID_PREV = int((G_ID == 0) ? int(cbSimulationConstants.g_iNumParticles) : G_ID);
+    uint G_ID = uint(gl_GlobalInvocationID.x);
+    uint G_ID_PREV = uint((int(G_ID) == 0) ? uint(cbSimulationConstants.g_iNumParticles) : G_ID);
     G_ID_PREV--;
-    int G_ID_NEXT = G_ID + 1;
-    if (uint(G_ID_NEXT) == cbSimulationConstants.g_iNumParticles)
+    uint G_ID_NEXT = uint(int(G_ID) + 1);
+    if (G_ID_NEXT == cbSimulationConstants.g_iNumParticles)
     {
-        G_ID_NEXT = 0;
+        G_ID_NEXT = uint(0);
     }
-    int cell = GridGetKey(gridRO.data[G_ID].grid);
-    int cell_prev = GridGetKey(gridRO.data[G_ID_PREV].grid);
-    int cell_next = GridGetKey(gridRO.data[G_ID_NEXT].grid);
+    uint cell = GridGetKey(gridRO.data[G_ID].grid);
+    uint cell_prev = GridGetKey(gridRO.data[G_ID_PREV].grid);
+    uint cell_next = GridGetKey(gridRO.data[G_ID_NEXT].grid);
     if (cell != cell_prev)
     {
         gridIndicesRW.data[cell].indices.x = uint(G_ID);
     }
     if (cell != cell_next)
     {
-        gridIndicesRW.data[cell].indices.y = uint(G_ID + 1);
+        gridIndicesRW.data[cell].indices.y = G_ID + uint(1);
     }
 }
 

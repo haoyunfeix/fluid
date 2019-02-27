@@ -69,7 +69,8 @@ vec2 GridCalculateCell(vec2 position)
 
 int GridConstuctKey(vec2 xy)
 {
-    return int(dot(vec2(xy.yx), vec2(256, 1)));
+    //return int(dot(vec2(xy.yx), vec2(256, 1)));
+    return int(int(xy.y) * 256 + int(xy.x));
 }
 
 float CalculatePressure(float density)
