@@ -34,6 +34,10 @@ layout(std140, binding = 0) buffer ParticlesRW
 {
     Particle particles[];
 } particlesRW;
+layout(std140, binding = 6) buffer ParticlesRWCOPY
+{
+    Particle particles[];
+} particlesRWCOPY;
 
 layout(std140, binding = 2) buffer ParticlesForcesRO
 {
@@ -44,8 +48,8 @@ layout(std140, binding = 2) buffer ParticlesForcesRO
 void main()
 {
     int P_ID = int(gl_GlobalInvocationID.x);
-    vec2 position = particlesRW.particles[P_ID].position;
-    vec2 velocity = particlesRW.particles[P_ID].velocity;
+    vec2 position = particlesRWCOPY.particles[P_ID].position;
+    vec2 velocity = particlesRWCOPY.particles[P_ID].velocity;
     vec2 acceleration = particlesForcesRO.particles[P_ID].acceleration;
     for (int i = 0; i < 4; i++)
     {
