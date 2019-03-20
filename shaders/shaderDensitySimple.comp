@@ -1,7 +1,7 @@
 #version 310 es
 precision mediump float;
 
-layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = NUM_THREADS, local_size_y = 1, local_size_z = 1) in;
 
 struct Particle
 {
@@ -17,7 +17,7 @@ struct ParticleDensity
     float padding3;
 };
 
-layout(std140, binding = 0) uniform CbSimulationConstants
+layout(std140, binding = 10) uniform CbSimulationConstants
 {
     uint  g_iNumParticles;
     float g_fTimeStep;
@@ -33,12 +33,12 @@ layout(std140, binding = 0) uniform CbSimulationConstants
     vec3  g_vPlanes[4];
 } cbSimulationConstants;
 
-layout(std140, binding = 1) buffer ParticlesRO
+layout(std140, binding = 0) buffer ParticlesRO
 {
     Particle particles[];
 } particlesRO;
 
-layout(std140, binding = 2) buffer ParticlesDensityRW
+layout(std140, binding = 1) buffer ParticlesDensityRW
 {
     ParticleDensity particles[];
 } particlesDensityRW;
