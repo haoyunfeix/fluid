@@ -26,7 +26,7 @@ struct GridIndices
     uvec2 indices;
 };
 
-layout(std140, binding = 10) uniform Cb
+layout(std140, binding = 0) uniform Cb
 {
     uint  g_iNumParticles;
     float g_fTimeStep;

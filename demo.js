@@ -246,7 +246,7 @@ function changeGravity(g) {
   gl.bindBuffer(gl.UNIFORM_BUFFER, gUpdateParams);
   gl.bufferSubData(gl.UNIFORM_BUFFER, 12*4, view1, 0);
 
-  gl.bindBufferBase(gl.UNIFORM_BUFFER, 10, gUpdateParams);
+  gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, gUpdateParams);
 }
 
 function resetParticles() {
@@ -281,7 +281,7 @@ function gpuSort() {
     let updateSortCB = gl.createBuffer();
     gl.bindBuffer(gl.UNIFORM_BUFFER, updateSortCB);
     gl.bufferData(gl.UNIFORM_BUFFER, sortCB, gl.STATIC_DRAW);
-    gl.bindBufferBase(gl.UNIFORM_BUFFER, 11, updateSortCB);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 1, updateSortCB);
 
     // Sort the row data
     computePass(CS_BITONIC_SORT, gNumParticles / BITONIC_BLOCK_SIZE, 1, 1);
@@ -298,7 +298,7 @@ function gpuSort() {
     let updateSortCB1 = gl.createBuffer();
     gl.bindBuffer(gl.UNIFORM_BUFFER, updateSortCB1);
     gl.bufferData(gl.UNIFORM_BUFFER, sortCB1, gl.STATIC_DRAW);
-    gl.bindBufferBase(gl.UNIFORM_BUFFER, 11, updateSortCB1);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 1, updateSortCB1);
 
     // Transpose the data from buffer 1 into buffer 2
     computePass(CS_TRANSPOSE, MATRIX_WIDTH / TRANSPOSE_BLOCK_SIZE,
@@ -318,7 +318,7 @@ function gpuSort() {
     gl.bufferData(gl.UNIFORM_BUFFER, sortCB2, gl.STATIC_DRAW);
 
     // Transpose the data from buffer 2 back into buffer 1
-    gl.bindBufferBase(gl.UNIFORM_BUFFER, 11, updateSortCB2);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 1, updateSortCB2);
     gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 4, gParticleBuffers[3]);
     computePass(CS_TRANSPOSE, MATRIX_HEIGHT / TRANSPOSE_BLOCK_SIZE,
         MATRIX_WIDTH / TRANSPOSE_BLOCK_SIZE, 1);
@@ -445,7 +445,7 @@ function initBuffers() {
   gl.bindBuffer(gl.UNIFORM_BUFFER, gUpdateParams);
   gl.bufferData(gl.UNIFORM_BUFFER, new Uint8Array(data), gl.STATIC_DRAW);
 
-  gl.bindBufferBase(gl.UNIFORM_BUFFER, 10, gUpdateParams);
+  gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, gUpdateParams);
 
   let orthographic =
       function(left, right, bottom, top, near, far) {

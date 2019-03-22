@@ -15,7 +15,7 @@ struct Grid
     int padding3;
 };
 
-layout(std140, binding = 11) uniform Cb
+layout(std140, binding = 1) uniform Cb
 {
     int g_iLevel;
     int g_iLevelMask;
