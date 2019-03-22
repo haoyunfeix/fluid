@@ -16,7 +16,7 @@ struct Grid
     uint padding3;
 };
 
-layout(std140, binding = 10) uniform CbSimulationConstants
+layout(std140, binding = 10) uniform Cb
 {
     uint  g_iNumParticles;
     float g_fTimeStep;
@@ -30,7 +30,7 @@ layout(std140, binding = 10) uniform CbSimulationConstants
     vec4  g_vGravity;
     vec4  g_vGridDim;
     vec3  g_vPlanes[4];
-} cbSimulationConstants;
+} cb;
 
 layout(std140, binding = 0) buffer ParticlesRO
 {
@@ -44,7 +44,7 @@ layout(std140, binding = 3) buffer GridRW
 
 vec2 GridCalculateCell(vec2 position)
 {
-    return clamp(position * cbSimulationConstants.g_vGridDim.xy + cbSimulationConstants.g_vGridDim.zw, vec2(0, 0), vec2(255, 255));
+    return clamp(position * cb.g_vGridDim.xy + cb.g_vGridDim.zw, vec2(0, 0), vec2(255, 255));
 }
 
 uint GridConstuctKeyValuePair(uvec2 xy, uint value)
@@ -58,6 +58,4 @@ void main()
     vec2 position = particlesRO.data[P_ID].position;
     vec2 grid_xy = GridCalculateCell(position);
     gridRW.data[P_ID].grid = GridConstuctKeyValuePair(uvec2(grid_xy), uint(P_ID));
-    //gridRW.data[P_ID].grid = GridConstuctKeyValuePair(uvec2(uint(0), uint(0)), uint(grid_xy.x));
 }
-

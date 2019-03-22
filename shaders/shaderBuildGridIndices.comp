@@ -15,7 +15,7 @@ struct GridIndices
     uvec2 indices;
 };
 
-layout(std140, binding = 10) uniform CbSimulationConstants
+layout(std140, binding = 10) uniform Cb
 {
     uint  g_iNumParticles;
     float g_fTimeStep;
@@ -29,7 +29,7 @@ layout(std140, binding = 10) uniform CbSimulationConstants
     vec4  g_vGravity;
     vec4  g_vGridDim;
     vec3  g_vPlanes[4];
-} cbSimulationConstants;
+} cb;
 
 layout(std140, binding = 3) buffer GridRO
 {
@@ -49,10 +49,10 @@ uint GridGetKey(uint keyvaluepair)
 void main()
 {
     uint G_ID = uint(gl_GlobalInvocationID.x);
-    uint G_ID_PREV = uint((int(G_ID) == 0) ? uint(cbSimulationConstants.g_iNumParticles) : G_ID);
+    uint G_ID_PREV = uint((int(G_ID) == 0) ? uint(cb.g_iNumParticles) : G_ID);
     G_ID_PREV--;
     uint G_ID_NEXT = uint(int(G_ID) + 1);
-    if (G_ID_NEXT == cbSimulationConstants.g_iNumParticles)
+    if (G_ID_NEXT == cb.g_iNumParticles)
     {
         G_ID_NEXT = uint(0);
     }
@@ -68,4 +68,3 @@ void main()
         gridIndicesRW.data[cell].indices.y = G_ID + uint(1);
     }
 }
-

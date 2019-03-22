@@ -27,13 +27,13 @@ layout(std140, binding = 11) uniform CB
 layout(std140, binding = 3) buffer Data
 {
     Grid data[];
-} dat;
+} data;
 
 shared int shared_data[512];
 
 void main()
 {
-    shared_data[gl_LocalInvocationIndex] = dat.data[gl_GlobalInvocationID.x].grid;
+    shared_data[gl_LocalInvocationIndex] = data.data[gl_GlobalInvocationID.x].grid;
     GroupMemoryBarrierWithGroupSync();
     for (int j = cb.g_iLevel >> 1; j > 0; j >>= 1)
     {
@@ -42,6 +42,6 @@ void main()
         shared_data[gl_LocalInvocationIndex] = result;
         GroupMemoryBarrierWithGroupSync();
     }
-    dat.data[gl_GlobalInvocationID.x].grid = shared_data[gl_LocalInvocationIndex];
+    data.data[gl_GlobalInvocationID.x].grid = shared_data[gl_LocalInvocationIndex];
 }
 

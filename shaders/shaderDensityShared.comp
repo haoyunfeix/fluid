@@ -22,7 +22,7 @@ struct ParticleDensity
     float padding3;
 };
 
-layout(std140, binding = 10) uniform CbSimulationConstants
+layout(std140, binding = 10) uniform Cb
 {
     uint  g_iNumParticles;
     float g_fTimeStep;
@@ -36,11 +36,11 @@ layout(std140, binding = 10) uniform CbSimulationConstants
     vec4  g_vGravity;
     vec4  g_vGridDim;
     vec3  g_vPlanes[4];
-} cbSimulationConstants;
+} cb;
 
 layout(std140, binding = 0) buffer ParticlesRO
 {
-    Particle particles[];
+    readonly Particle particles[];
 } particlesRO;
 
 layout(std140, binding = 1) buffer ParticlesDensityRW
@@ -50,8 +50,8 @@ layout(std140, binding = 1) buffer ParticlesDensityRW
 
 float CalculateDensity(float r_sq)
 {
-    float h_sq = cbSimulationConstants.g_fSmoothlen * cbSimulationConstants.g_fSmoothlen;
-    return cbSimulationConstants.g_fDensityCoef * (h_sq - r_sq) * (h_sq - r_sq) * (h_sq - r_sq);
+    float h_sq = cb.g_fSmoothlen * cb.g_fSmoothlen;
+    return cb.g_fDensityCoef * (h_sq - r_sq) * (h_sq - r_sq) * (h_sq - r_sq);
 }
 
 shared vec2 density_shared_pos[NUM_THREADS];
@@ -59,10 +59,10 @@ shared vec2 density_shared_pos[NUM_THREADS];
 void main()
 {
     int P_ID = int(gl_GlobalInvocationID.x);
-    float h_sq = cbSimulationConstants.g_fSmoothlen * cbSimulationConstants.g_fSmoothlen;
+    float h_sq = cb.g_fSmoothlen * cb.g_fSmoothlen;
     vec2 P_position = particlesRO.particles[P_ID].position;
     float density = 0.0f;
-    for (uint N_block_ID = 0u; N_block_ID < cbSimulationConstants.g_iNumParticles; N_block_ID += NUM_THREADSu)
+    for (uint N_block_ID = 0u; N_block_ID < cb.g_iNumParticles; N_block_ID += NUM_THREADSu)
     {
         density_shared_pos[gl_LocalInvocationIndex] = particlesRO.particles[N_block_ID + gl_LocalInvocationIndex].position;
         GroupMemoryBarrierWithGroupSync();
@@ -80,4 +80,3 @@ void main()
     }
     particlesDensityRW.particles[P_ID].density = density;
 }
-

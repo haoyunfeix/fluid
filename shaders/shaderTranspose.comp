@@ -15,7 +15,7 @@ struct Grid
     int padding3;
 };
 
-layout(std140, binding = 11) uniform CB
+layout(std140, binding = 11) uniform Cb
 {
     int g_iLevel;
     int g_iLevelMask;
@@ -39,12 +39,9 @@ void main()
 {
     uint ID = gl_GlobalInvocationID.y * uint(cb.g_iWidth) + gl_GlobalInvocationID.x;
     transpose_shared_data[gl_LocalInvocationIndex] = inputData.data[ID].grid;
-    //transpose_shared_data[gl_LocalInvocationIndex] = inputData.data[gl_GlobalInvocationID.y * uint(cb.g_iWidth) + gl_GlobalInvocationID.x].grid;
     GroupMemoryBarrierWithGroupSync();
     uvec2 XY = gl_GlobalInvocationID.yx - gl_LocalInvocationID.yx + gl_LocalInvocationID.xy;
     uint CID = XY.y * uint(cb.g_iHeight) + XY.x;
     uint DID = gl_LocalInvocationID.x * 16u + gl_LocalInvocationID.y;
     tempData.data[CID].grid = transpose_shared_data[DID];
-    //tempData.data[XY.y * uint(cb.g_iHeight) + XY.x].grid = transpose_shared_data[gl_LocalInvocationID.x * 16u + gl_LocalInvocationID.y];
 }
-

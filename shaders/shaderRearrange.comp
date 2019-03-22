@@ -40,8 +40,6 @@ void main()
 {
     int ID = int(gl_GlobalInvocationID.x);
     int G_ID = GridGetValue(gridRO.data[ID].grid);
-    //particlesRW.data[ID] = particlesRO.data[G_ID];
     particlesRW.data[ID].position = particlesRO.data[G_ID].position;
     particlesRW.data[ID].velocity = particlesRO.data[G_ID].velocity;
 }
-

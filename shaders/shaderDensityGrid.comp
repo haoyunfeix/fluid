@@ -21,7 +21,7 @@ struct GridIndices
     uvec2 indices;
 };
 
-layout(std140, binding = 10) uniform CbSimulationConstants
+layout(std140, binding = 10) uniform Cb
 {
     uint  g_iNumParticles;
     float g_fTimeStep;
@@ -35,7 +35,7 @@ layout(std140, binding = 10) uniform CbSimulationConstants
     vec4  g_vGravity;
     vec4  g_vGridDim;
     vec3  g_vPlanes[4];
-} cbSimulationConstants;
+} cb;
 
 layout(std140, binding = 6) buffer ParticlesRW
 {
@@ -54,7 +54,7 @@ layout(std140, binding = 5) buffer GridIndicesRO
 
 vec2 GridCalculateCell(vec2 position)
 {
-    return clamp(position * cbSimulationConstants.g_vGridDim.xy + cbSimulationConstants.g_vGridDim.zw, vec2(0, 0), vec2(255, 255));
+    return clamp(position * cb.g_vGridDim.xy + cb.g_vGridDim.zw, vec2(0, 0), vec2(255, 255));
 }
 
 int GridConstuctKey(ivec2 xy)
@@ -64,14 +64,14 @@ int GridConstuctKey(ivec2 xy)
 
 float CalculateDensity(float r_sq)
 {
-    float h_sq = cbSimulationConstants.g_fSmoothlen * cbSimulationConstants.g_fSmoothlen;
-    return cbSimulationConstants.g_fDensityCoef * (h_sq - r_sq) * (h_sq - r_sq) * (h_sq - r_sq);
+    float h_sq = cb.g_fSmoothlen * cb.g_fSmoothlen;
+    return cb.g_fDensityCoef * (h_sq - r_sq) * (h_sq - r_sq) * (h_sq - r_sq);
 }
 
 void main()
 {
     int P_ID = int(gl_GlobalInvocationID.x);
-    float h_sq = cbSimulationConstants.g_fSmoothlen * cbSimulationConstants.g_fSmoothlen;
+    float h_sq = cb.g_fSmoothlen * cb.g_fSmoothlen;
     vec2 P_position = particlesRW.particles[P_ID].position;
     float density = 0.0f;
     ivec2 G_XY = ivec2(GridCalculateCell(P_position));
@@ -95,4 +95,3 @@ void main()
     }
     particlesDensityRW.particles[P_ID].density = density;
 }
-

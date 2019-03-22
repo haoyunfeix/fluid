@@ -17,4 +17,3 @@ void main()
 {
     gridIndicesRW.data[gl_GlobalInvocationID.x].indices = uvec2(0, 0);
 }
-
