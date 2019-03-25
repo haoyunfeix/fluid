@@ -76,7 +76,6 @@ let gFPSCounter = null;
 let gFpsElem = null;
 let gScheduledRAF = false;
 
-let gInitCntl = false;
 let gPointSize = 0;
 
 function loadShader(type, shaderSrc) {
@@ -106,35 +105,33 @@ function getUrlString(name) {
   return null;
 }
 
-function initController() {
-  if (gInitCntl) return;
-  gInitCntl = true;
-  function createElement(element, attribute, inner) {
-    if (typeof(element) === 'undefined') {
-      return false;
-    }
-    if (typeof(inner) === 'undefined') {
-      inner = '';
-    }
-    let el = document.createElement(element);
-    if (typeof(attribute) === 'object') {
-      for (let key in attribute) {
-        el.setAttribute(key, attribute[key]);
-      }
-    }
-    if (!Array.isArray(inner)) {
-      inner = [inner];
-    }
-    for (let k = 0; k < inner.length; k++) {
-      if (inner[k].tagName) {
-        el.appendChild(inner[k]);
-      } else {
-        el.appendChild(document.createTextNode(inner[k]));
-      }
-    }
-    return el;
+function createElement(element, attribute, inner) {
+  if (typeof(element) === 'undefined') {
+    return false;
   }
+  if (typeof(inner) === 'undefined') {
+    inner = '';
+  }
+  let el = document.createElement(element);
+  if (typeof(attribute) === 'object') {
+    for (let key in attribute) {
+      el.setAttribute(key, attribute[key]);
+    }
+  }
+  if (!Array.isArray(inner)) {
+    inner = [inner];
+  }
+  for (let k = 0; k < inner.length; k++) {
+    if (inner[k].tagName) {
+      el.appendChild(inner[k]);
+    } else {
+      el.appendChild(document.createTextNode(inner[k]));
+    }
+  }
+  return el;
+}
 
+function initController() {
   let fpsContainer = createElement('div', {'class': 'fpsContainer'});
   document.body.appendChild(fpsContainer);
   let lableFps = createElement('label', {}, 'FPS: ');
@@ -245,7 +242,6 @@ function changeGravity(g) {
 
   gl.bindBuffer(gl.UNIFORM_BUFFER, gUpdateParams);
   gl.bufferSubData(gl.UNIFORM_BUFFER, 12*4, view1, 0);
-
   gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, gUpdateParams);
 }
 
@@ -346,20 +342,11 @@ function initBuffers() {
   gl.bufferData(gl.SHADER_STORAGE_BUFFER, particles, gl.DYNAMIC_DRAW);
 
   let particleDensities = new Float32Array(4 * gNumParticles);
-  for ( let i = 0; i < 4 * gNumParticles;) {
-    particleDensities[i] = 0.0;
-    i += 4;
-  }
   gParticleBuffers[1] = gl.createBuffer();
   gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, gParticleBuffers[1]);
   gl.bufferData(gl.SHADER_STORAGE_BUFFER, particleDensities, gl.DYNAMIC_DRAW);
 
   let particleForces = new Float32Array(4 * gNumParticles);
-  for ( let i = 0; i < 4 * gNumParticles;) {
-    particleForces[i] = 0.0;
-    particleForces[i + 1] = 0.0;
-    i += 4;
-  }
   gParticleBuffers[2] = gl.createBuffer();
   gl.bindBuffer(gl.SHADER_STORAGE_BUFFER, gParticleBuffers[2]);
   gl.bufferData(gl.SHADER_STORAGE_BUFFER, particleForces, gl.DYNAMIC_DRAW);
