@@ -601,26 +601,26 @@ function simulateFluidShared() {
 
 function simulateFluidGrid() {
   // Build Grid
-  computePass(CS_BUILD_GRID, gNumParticles / SIMULATION_BLOCK_SIZE, 1, 1);
+  computePass(CS_BUILD_GRID, gNumParticles / gThreads, 1, 1);
 
   // Sort Grid
   gpuSort();
 
   // Build Grid Indices
-  computePass(CS_CLEAR_GRID_IND, NUM_GRID_INDICES / SIMULATION_BLOCK_SIZE, 1, 1);
-  computePass(CS_BUILD_GRID_IND, gNumParticles / SIMULATION_BLOCK_SIZE, 1, 1);
+  computePass(CS_CLEAR_GRID_IND, NUM_GRID_INDICES / gThreads, 1, 1);
+  computePass(CS_BUILD_GRID_IND, gNumParticles / gThreads, 1, 1);
 
   // Rearrange
-  computePass(CS_REARRANGE, gNumParticles / SIMULATION_BLOCK_SIZE, 1, 1);
+  computePass(CS_REARRANGE, gNumParticles / gThreads, 1, 1);
 
   // Density
-  computePass(CS_DEN_GRID, gNumParticles / SIMULATION_BLOCK_SIZE, 1, 1);
+  computePass(CS_DEN_GRID, gNumParticles / gThreads, 1, 1);
 
   // Force
-  computePass(CS_FOR_GRID, gNumParticles / SIMULATION_BLOCK_SIZE, 1, 1);
+  computePass(CS_FOR_GRID, gNumParticles / gThreads, 1, 1);
 
   // Integrate
-  computePass(CS_INT_GRID, gNumParticles / SIMULATION_BLOCK_SIZE, 1, 1);
+  computePass(CS_INT_GRID, gNumParticles / gThreads, 1, 1);
 }
 
 function frame() {
