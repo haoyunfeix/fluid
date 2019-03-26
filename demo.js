@@ -667,7 +667,7 @@ function loadShaderFromFile(filename, index, onLoadShader) {
   request.send();
 }
 
-function main() {
+var main = (function () {
   let shaders = [
     'shader.vert',
     'shader.frag',
@@ -693,4 +693,4 @@ function main() {
       if (++counter === shaders.length) start();
     });
   }
-}
+})();
